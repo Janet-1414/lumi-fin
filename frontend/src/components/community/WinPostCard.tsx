@@ -1,0 +1,42 @@
+"use client";
+import { Heart, Trophy } from "lucide-react";
+import Card from "@/components/ui/Card";
+import { formatDistanceToNow } from "date-fns";
+import type { CommunityPost } from "@/types/community";
+
+interface WinPostCardProps {
+  post: CommunityPost;
+  onLike: (id: string) => void;
+}
+
+export default function WinPostCard({ post, onLike }: WinPostCardProps) {
+  return (
+    <Card hoverable>
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-full bg-mg-gold/20 flex items-center justify-center flex-shrink-0">
+          <Trophy size={16} className="text-mg-gold" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-mg-gold">{post.display_name}</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+            </span>
+          </div>
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed">{post.content}</p>
+          {post.savings_percentage && (
+            <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-card bg-mg-success/10 border border-mg-success/20">
+              <span className="text-xs font-bold text-mg-success">+{post.savings_percentage}% saved</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-end mt-3 gap-2">
+        <button onClick={() => onLike(post.id)} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-mg-alert transition-colors">
+          <Heart size={14} />
+          {post.likes}
+        </button>
+      </div>
+    </Card>
+  );
+}
