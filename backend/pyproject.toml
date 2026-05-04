@@ -1,0 +1,51 @@
+[project]
+name = "lumi-backend"
+version = "0.1.0"
+description = "Lumi Financial Wellness API - East Africa"
+requires-python = ">=3.13"
+
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "python-multipart==0.0.20",
+    "sqlalchemy==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+    "psycopg2-binary==2.9.10",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "bcrypt==4.2.1",
+    "langchain==0.3.13",
+    "langchain-openai==0.2.14",
+    "langchain-core==0.3.28",
+    "langchain-community==0.3.13",
+    "langgraph==0.2.60",
+    "langsmith==0.2.6",
+    "openai==1.59.3",
+    "fastapi-mail==1.4.1",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "python-dotenv==1.0.1",
+    "httpx==0.28.1",
+    "python-dateutil==2.9.0.post0",
+    "pillow==11.1.0",
+    "anyio==4.7.0",
+    "aiofiles==24.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.0",
+    "pytest-cov==6.0.0",
+    "httpx==0.28.1",
+    "faker==33.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
