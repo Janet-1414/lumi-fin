@@ -37,7 +37,7 @@ async def scan_receipt(image_base64: str, image_type: str = "image/jpeg") -> dic
         temperature=0,
     )
 
-    content = response.choices[0].message.content.strip()
+    content = (response.choices[0].message.content or "").strip()
 
     # Strip markdown code fences if present
     if content.startswith("```"):

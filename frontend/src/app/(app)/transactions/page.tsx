@@ -58,7 +58,7 @@ export default function TransactionsPage() {
       <AddTransactionModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        onAdd={createTransaction}
+        onAdd={async (data) => { await createTransaction(data); }}
         currency={user.currency_code}
       />
     </div>

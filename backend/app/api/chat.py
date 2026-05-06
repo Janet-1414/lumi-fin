@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import AsyncGenerator
 from app.db.database import get_db
 from app.core.dependencies import get_current_pro_user
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import ChatRequest, ChatResponse, ChatMessage
 from app.ai.agent import LumiChatAgent
 
 router = APIRouter(prefix="/chat", tags=["AI Chat"])
@@ -18,16 +19,17 @@ async def chat(
 ):
     """Non-streaming chat endpoint."""
     agent = LumiChatAgent(db, current_user)
-    response_text = await agent.chat(data.message, [m.model_dump() for m in data.conversation_history])
+    history: list[dict] = [{"role": m.role, "content": m.content} for m in data.conversation_history]
+    response_text = await agent.chat(data.message, history)
 
-    updated_history = list(data.conversation_history) + [
+    updated_history = history + [
         {"role": "user", "content": data.message},
         {"role": "assistant", "content": response_text},
     ]
 
     return ChatResponse(
         response=response_text,
-        conversation_history=[{"role": m["role"], "content": m["content"]} for m in updated_history],
+        conversation_history=[ChatMessage(role=m["role"], content=m["content"]) for m in updated_history],
     )
 
 
@@ -43,12 +45,10 @@ async def chat_stream(
     from LangGraph + OpenAI.
     """
     agent = LumiChatAgent(db, current_user)
+    history: list[dict] = [{"role": m.role, "content": m.content} for m in data.conversation_history]
 
-    async def generate():
-        async for chunk in agent.stream_chat(
-            data.message,
-            [m.model_dump() for m in data.conversation_history],
-        ):
+    async def generate() -> AsyncGenerator[str, None]:
+        async for chunk in agent.stream_chat(data.message, history):
             yield chunk
 
     return StreamingResponse(

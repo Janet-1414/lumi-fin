@@ -22,7 +22,7 @@ async def generate_challenge(first_name: str, currency: str, spending_data: str)
         response_format={"type": "json_object"},
     )
 
-    content = response.choices[0].message.content
+    content = response.choices[0].message.content or ""
     try:
         return json.loads(content)
     except json.JSONDecodeError:

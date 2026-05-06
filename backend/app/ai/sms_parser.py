@@ -25,7 +25,7 @@ async def parse_sms(sms_text: str) -> dict:
         temperature=0,
     )
 
-    content = response.choices[0].message.content.strip()
+    content = (response.choices[0].message.content or "").strip()
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):

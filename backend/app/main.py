@@ -58,4 +58,4 @@ app.include_router(ai.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 
-touch /home/claude/lumi/backend/app/__init__.py
+

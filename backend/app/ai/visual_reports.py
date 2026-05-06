@@ -4,6 +4,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from app.config import settings
 from app.ai.prompts import get_visual_report_prompt
+from pydantic import SecretStr
+
 
 
 async def generate_report_summary(
@@ -19,9 +21,9 @@ async def generate_report_summary(
     This summary accompanies the visual charts on the Reports page.
     """
     llm = ChatOpenAI(
-        model=settings.OPENAI_MODEL_HEAVY,
-        temperature=0.5,
-        api_key=settings.OPENAI_API_KEY,
+        model=settings.OPENAI_MODEL_LIGHT,
+        temperature=0.6,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
     )
 
     prompt_template = ChatPromptTemplate.from_messages([
@@ -32,4 +34,5 @@ async def generate_report_summary(
     chain = prompt_template | llm | StrOutputParser()
 
     report_prompt = get_visual_report_prompt(first_name, currency, period, income, expenses, top_categories)
-    return await chain.ainvoke({"report_prompt": report_prompt})
+    result: str = await chain.ainvoke({"report_prompt": report_prompt})
+    return result

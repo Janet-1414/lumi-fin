@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime, date
 from sqlalchemy import String, Numeric, DateTime, Date, Boolean, Integer, ForeignKey, Enum as SAEnum, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 import enum
+
+VC = lambda x: [e.value for e in x]
 
 
 class ChallengeStatus(str, enum.Enum):
@@ -26,7 +28,9 @@ class Challenge(Base):
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[ChallengeStatus] = mapped_column(SAEnum(ChallengeStatus), default=ChallengeStatus.ACTIVE, nullable=False)
+    status: Mapped[ChallengeStatus] = mapped_column(
+        SAEnum(ChallengeStatus, values_callable=VC), default=ChallengeStatus.ACTIVE, nullable=False
+    )
     is_community: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ai_generated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     participants_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -23,7 +23,7 @@ async def decide_notification(first_name: str, currency: str, context: str) -> d
         response_format={"type": "json_object"},
     )
 
-    content = response.choices[0].message.content
+    content = response.choices[0].message.content or ""
     try:
         return json.loads(content)
     except json.JSONDecodeError:

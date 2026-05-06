@@ -1,12 +1,15 @@
 import pytest
 import asyncio
+from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from app.main import app
 from app.db.database import get_db
 from app.db.base import Base
-from app.models import User, Transaction, SavingsGoal, Streak
+from app.models.user import User
+from app.models.savings_goal import SavingsGoal
+from app.models.streak import Streak 
 
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/lumi_test"
 
@@ -14,7 +17,7 @@ test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 TestSessionLocal = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def override_get_db():
+async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
     async with TestSessionLocal() as session:
         try:
             yield session
@@ -44,20 +47,20 @@ async def setup_db():
 
 
 @pytest.fixture
-async def db():
+async def db() -> AsyncGenerator[AsyncSession, None]:
     async with TestSessionLocal() as session:
         yield session
         await session.rollback()
 
 
 @pytest.fixture
-async def client():
+async def client() -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
 
 @pytest.fixture
-async def test_user(db: AsyncSession):
+async def test_user(db: AsyncSession) -> User:
     from app.core.security import hash_password
     import uuid
     user = User(
@@ -78,7 +81,7 @@ async def test_user(db: AsyncSession):
 
 
 @pytest.fixture
-async def auth_client(client: AsyncClient, test_user: User):
+async def auth_client(client: AsyncClient, test_user: User) -> AsyncClient:
     """Client with auth cookie already set."""
     response = await client.post("/api/v1/auth/login", json={
         "email": "nakato@test.com",

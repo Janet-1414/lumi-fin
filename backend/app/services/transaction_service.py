@@ -12,7 +12,7 @@ FREE_TIER_MONTHLY_LIMIT = 20
 
 
 class TransactionService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def check_monthly_limit(self, user: User) -> None:
@@ -26,7 +26,7 @@ class TransactionService:
                 func.extract("year", Transaction.created_at) == now.year,
             )
         )
-        count = count_result.scalar()
+        count = count_result.scalar() or 0
         if count >= FREE_TIER_MONTHLY_LIMIT:
             raise ForbiddenError(
                 f"Free tier limit reached ({FREE_TIER_MONTHLY_LIMIT} transactions/month). "
@@ -139,6 +139,6 @@ class TransactionService:
             total_income=total_income,
             total_expenses=total_expenses,
             balance=total_income - total_expenses,
-            transaction_count=count_result.scalar() or 0,
+            transaction_count=int(count_result.scalar() or 0),
             period=period,
         )

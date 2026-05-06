@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, ForeignKey, Enum as SAEnum
@@ -5,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 import enum
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
+VC = lambda x: [e.value for e in x]
 
 
 class BadgeType(str, enum.Enum):
@@ -32,8 +39,12 @@ class Badge(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    name: Mapped[BadgeName] = mapped_column(SAEnum(BadgeName), nullable=False)
-    badge_type: Mapped[BadgeType] = mapped_column(SAEnum(BadgeType), nullable=False)
+    name: Mapped[BadgeName] = mapped_column(
+        SAEnum(BadgeName, values_callable=VC), nullable=False
+    )
+    badge_type: Mapped[BadgeType] = mapped_column(
+        SAEnum(BadgeType, values_callable=VC), nullable=False
+    )
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     unlocked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 

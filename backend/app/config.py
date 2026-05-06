@@ -11,16 +11,16 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str
-    DATABASE_URL_SYNC: str
+    DATABASE_URL: str = ""
+    DATABASE_URL_SYNC: str = ""
 
     # JWT
-    SECRET_KEY: str
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
 
     # OpenAI
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
     OPENAI_MODEL_HEAVY: str = "gpt-4o"
     OPENAI_MODEL_LIGHT: str = "gpt-4o-mini"
     OPENAI_MODEL_VISION: str = "gpt-4o"

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.schemas.user import UserSignupRequest, UserLoginRequest, UserResponse, TokenResponse
-from app.services.auth_service import AuthService
+from app.services.auth_service import AuthService  # noqa: F401
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.config import settings

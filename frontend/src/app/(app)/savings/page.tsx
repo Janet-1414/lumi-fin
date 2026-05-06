@@ -95,8 +95,7 @@ export default function SavingsPage() {
       </div>
 
       <BadgeGrid badges={badges} />
-
-      <AddGoalModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onAdd={createGoal} currency={user.currency_code} />
+      <AddGoalModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onAdd={async (data) => { await createGoal(data); }} currency={user.currency_code} />
     </div>
   );
 }

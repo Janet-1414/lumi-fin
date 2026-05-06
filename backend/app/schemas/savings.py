@@ -47,12 +47,6 @@ class SavingsGoalResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    @property
-    def progress_percentage(self) -> float:
-        if self.target_amount == 0:
-            return 0.0
-        return round((self.current_amount / self.target_amount) * 100, 2)
-
 
 class StreakResponse(BaseModel):
     current_streak: int

@@ -29,7 +29,7 @@ async def generate_investment_hint(
         response_format={"type": "json_object"},
     )
 
-    content = response.choices[0].message.content
+    content = response.choices[0].message.content or ""
     try:
         return json.loads(content)
     except json.JSONDecodeError:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import uuid
 from datetime import datetime, date
 from sqlalchemy import String, Numeric, DateTime, Date, Boolean, ForeignKey, Enum as SAEnum
@@ -5,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 import enum
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
+VC = lambda x: [e.value for e in x]
 
 
 class GoalStatus(str, enum.Enum):
@@ -24,7 +31,9 @@ class SavingsGoal(Base):
     target_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
     current_amount: Mapped[float] = mapped_column(Numeric(15, 2), default=0.0, nullable=False)
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
-    status: Mapped[GoalStatus] = mapped_column(SAEnum(GoalStatus), default=GoalStatus.ACTIVE, nullable=False)
+    status: Mapped[GoalStatus] = mapped_column(
+        SAEnum(GoalStatus, values_callable=VC), default=GoalStatus.ACTIVE, nullable=False
+    )
     emoji: Mapped[str | None] = mapped_column(String(10), nullable=True)
     ai_coached: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     weekly_target: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
@@ -33,5 +42,4 @@ class SavingsGoal(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
-    # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="savings_goals")
+    user: Mapped[User] = relationship("User", back_populates="savings_goals")

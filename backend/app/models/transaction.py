@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Numeric, DateTime, Boolean, Text, ForeignKey, Enum as SAEnum
@@ -5,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 import enum
+
+if TYPE_CHECKING:
+    from app.models.user import User
+
+VC = lambda x: [e.value for e in x]
 
 
 class TransactionType(str, enum.Enum):
@@ -34,8 +41,12 @@ class Transaction(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
-    type: Mapped[TransactionType] = mapped_column(SAEnum(TransactionType), nullable=False)
-    category: Mapped[TransactionCategory] = mapped_column(SAEnum(TransactionCategory), nullable=False)
+    type: Mapped[TransactionType] = mapped_column(
+        SAEnum(TransactionType, values_callable=VC), nullable=False
+    )
+    category: Mapped[TransactionCategory] = mapped_column(
+        SAEnum(TransactionCategory, values_callable=VC), nullable=False
+    )
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     merchant: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ai_scanned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

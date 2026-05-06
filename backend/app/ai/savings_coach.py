@@ -4,6 +4,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.config import settings
 from app.ai.prompts import get_savings_coach_prompt
 from datetime import date
+from pydantic import SecretStr
 
 
 async def generate_coaching_message(
@@ -19,10 +20,10 @@ async def generate_coaching_message(
     generate personalised savings coaching messages.
     """
     llm = ChatOpenAI(
-        model=settings.OPENAI_MODEL_LIGHT,
-        temperature=0.7,
-        api_key=settings.OPENAI_API_KEY,
-    )
+    model=settings.OPENAI_MODEL_LIGHT,
+    temperature=0.6,
+    api_key=SecretStr(settings.OPENAI_API_KEY),
+)
 
     deadline_days = None
     if deadline:
@@ -36,4 +37,4 @@ async def generate_coaching_message(
     ]
 
     response = await llm.ainvoke(messages)
-    return response.content
+    return str(response.content)

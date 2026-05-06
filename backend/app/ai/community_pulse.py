@@ -3,6 +3,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from app.config import settings
 from app.ai.prompts import get_community_pulse_prompt
+from pydantic import SecretStr
+
 
 
 async def generate_community_pulse(
@@ -16,11 +18,11 @@ async def generate_community_pulse(
     Aggregated data only — no individual amounts or names ever included.
     """
     llm = ChatOpenAI(
-        model=settings.OPENAI_MODEL_LIGHT,
-        temperature=0.6,
-        api_key=settings.OPENAI_API_KEY,
-    )
+    model=settings.OPENAI_MODEL_LIGHT,
+    temperature=0.6,
+    api_key=SecretStr(settings.OPENAI_API_KEY),
+)
 
     prompt = get_community_pulse_prompt(total_savers, total_goals_achieved, avg_savings_rate, top_challenge)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return response.content
+    return str(response.content)

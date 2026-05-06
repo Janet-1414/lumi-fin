@@ -11,7 +11,7 @@ from app.schemas.savings import (
 from app.services.savings_service import SavingsService
 from app.ai.savings_coach import generate_coaching_message
 from app.ai.savings_challenges import generate_challenge
-from app.services.transaction_service import TransactionService
+from app.services.transaction_service import TransactionService  # noqa: F401
 
 router = APIRouter(prefix="/savings", tags=["Savings"])
 

@@ -3,6 +3,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from app.config import settings
 from app.ai.prompts import get_spending_alert_prompt
+from pydantic import SecretStr
+
 
 
 async def generate_spending_alert(
@@ -14,9 +16,10 @@ async def generate_spending_alert(
     """
     llm = ChatOpenAI(
         model=settings.OPENAI_MODEL_LIGHT,
-        temperature=0.7,
-        api_key=settings.OPENAI_API_KEY,
+        temperature=0.6,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
+
     )
     prompt = get_spending_alert_prompt(first_name, currency, category, spent, budget)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return response.content
+    return str(response.content)

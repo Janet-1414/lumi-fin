@@ -9,6 +9,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import trim_messages
+from pydantic import SecretStr
 from app.config import settings
 import operator
 
@@ -33,7 +34,7 @@ def create_lumi_graph(tools: list):
         model=settings.OPENAI_MODEL_HEAVY,
         temperature=0.7,
         streaming=True,
-        api_key=settings.OPENAI_API_KEY,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
     )
 
     # Bind tools to the LLM so it can call them
@@ -71,7 +72,8 @@ def create_lumi_graph(tools: list):
         Otherwise, end the graph.
         """
         last_message = state["messages"][-1]
-        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        # Cast to AIMessage to access tool_calls attribute
+        if isinstance(last_message, AIMessage) and last_message.tool_calls:
             return "tool_node"
         return END
 

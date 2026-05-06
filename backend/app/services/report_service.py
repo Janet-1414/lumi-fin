@@ -7,7 +7,7 @@ from app.schemas.reports import ReportResponse, CategoryBreakdown, MonthlyData
 
 
 class ReportService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def get_report(self, user: User, period: str = "month") -> ReportResponse:
@@ -48,7 +48,7 @@ class ReportService:
             select(
                 Transaction.category,
                 func.sum(Transaction.amount).label("total"),
-                func.count(Transaction.id).label("count"),
+                func.count(Transaction.id).label("cnt"),
             )
             .where(and_(*conditions, Transaction.type == TransactionType.EXPENSE))
             .group_by(Transaction.category)
@@ -63,7 +63,7 @@ class ReportService:
                 category=row.category.value,
                 amount=float(row.total),
                 percentage=pct,
-                transaction_count=row.count,
+                transaction_count=int(row.cnt),
             ))
 
         if not monthly_data:
