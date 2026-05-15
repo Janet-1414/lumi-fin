@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
 import { useNotificationStore } from "@/store/notificationStore";
 import Avatar from "@/components/ui/Avatar";
+import { useEffect } from "react";
+import { getNotifications } from "@/lib/notifications";
 
 export default function TopBar() {
   const user = useUser();
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const { unreadCount, setNotifications } = useNotificationStore();
+
+  useEffect(() => {
+    getNotifications().then(setNotifications).catch(() => {});
+  }, []);
 
   return (
     <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]">

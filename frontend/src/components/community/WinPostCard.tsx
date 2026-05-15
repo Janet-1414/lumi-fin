@@ -1,5 +1,5 @@
 "use client";
-import { Heart, Trophy } from "lucide-react";
+import { Heart, MessageCircle, Trophy } from "lucide-react";
 import Card from "@/components/ui/Card";
 import { formatDistanceToNow } from "date-fns";
 import type { CommunityPost } from "@/types/community";
@@ -7,9 +7,11 @@ import type { CommunityPost } from "@/types/community";
 interface WinPostCardProps {
   post: CommunityPost;
   onLike: (id: string) => void;
+  onComment: (post: CommunityPost) => void;
+  hasLiked: boolean;
 }
 
-export default function WinPostCard({ post, onLike }: WinPostCardProps) {
+export default function WinPostCard({ post, onLike, onComment, hasLiked }: WinPostCardProps) {
   return (
     <Card hoverable>
       <div className="flex items-start gap-3">
@@ -31,9 +33,25 @@ export default function WinPostCard({ post, onLike }: WinPostCardProps) {
           )}
         </div>
       </div>
-      <div className="flex items-center justify-end mt-3 gap-2">
-        <button onClick={() => onLike(post.id)} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-mg-alert transition-colors">
-          <Heart size={14} />
+      <div className="flex items-center justify-end mt-3 gap-3">
+        <button
+          onClick={() => onComment(post)}
+          className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-mg-gold transition-colors"
+        >
+          <MessageCircle size={14} />
+          Comment
+        </button>
+        <button
+          onClick={() => !hasLiked && onLike(post.id)}
+          disabled={hasLiked}
+          className={`flex items-center gap-1.5 text-xs transition-colors ${
+            hasLiked
+              ? "text-mg-alert cursor-default"
+              : "text-[var(--text-muted)] hover:text-mg-alert cursor-pointer"
+          }`}
+          title={hasLiked ? "Already liked" : "Like this post"}
+        >
+          <Heart size={14} fill={hasLiked ? "currentColor" : "none"} />
           {post.likes}
         </button>
       </div>

@@ -28,6 +28,7 @@ export function useTransactions(period: string = "month") {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const createTransaction = async (data: CreateTransactionPayload) => {
+    // Backend now auto-checks in the streak when a transaction is created
     const tx = await api.post<Transaction>("/transactions", data);
     setTransactions((prev) => [tx, ...prev]);
     toast.success("Transaction added!");

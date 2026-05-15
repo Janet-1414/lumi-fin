@@ -1,31 +1,57 @@
 "use client";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { API_BASE } from "@/lib/api";
 import type { ChatMessage } from "@/types/api";
 
+const STORAGE_KEY = "lumi_chat_current";
+const MAX_STORED = 50;
+
+function loadHistory(): ChatMessage[] {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(messages: ChatMessage[]) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_STORED)));
+  } catch {}
+}
+
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessagesState] = useState<ChatMessage[]>(() => loadHistory());
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    saveHistory(messages);
+  }, [messages]);
+
+  const setMessages = useCallback((msgs: ChatMessage[]) => {
+    setMessagesState(msgs);
+  }, []);
+
   const sendMessage = useCallback(async (content: string) => {
     const userMsg: ChatMessage = { role: "user", content };
-    setMessages((prev) => [...prev, userMsg]);
-
     const assistantMsg: ChatMessage = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, assistantMsg]);
+
+    setMessagesState((prev) => [...prev, userMsg, assistantMsg]);
     setIsStreaming(true);
 
     abortRef.current = new AbortController();
 
     try {
+      const snapshot = messages;
       const response = await fetch(`${API_BASE}/api/v1/chat/stream`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: content,
-          conversation_history: messages,
+          conversation_history: snapshot,
         }),
         signal: abortRef.current.signal,
       });
@@ -42,32 +68,27 @@ export function useChat() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
+        for (const line of chunk.split("\n")) {
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6).trim();
           if (data === "[DONE]") break;
           try {
             const parsed = JSON.parse(data);
             if (parsed.token) {
-              setMessages((prev) => {
+              setMessagesState((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 updated[updated.length - 1] = { ...last, content: last.content + parsed.token };
                 return updated;
               });
             }
-          } catch {
-            // Skip malformed chunks
-          }
+          } catch {}
         }
       }
     } catch (error: any) {
       if (error.name === "AbortError") return;
-      setMessages((prev) => {
+      setMessagesState((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
@@ -87,7 +108,10 @@ export function useChat() {
     setIsStreaming(false);
   };
 
-  const clearChat = () => setMessages([]);
+  const clearChat = () => {
+    setMessagesState([]);
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+  };
 
-  return { messages, isStreaming, sendMessage, stopStreaming, clearChat };
+  return { messages, isStreaming, sendMessage, stopStreaming, clearChat, setMessages };
 }

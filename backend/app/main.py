@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.ai.langsmith_config import configure_langsmith
+from app.scheduler import start_scheduler, stop_scheduler
 from app.api import auth, transactions, savings, reports, community, chat, ai, profile, notifications
 
 
@@ -11,8 +12,10 @@ from app.api import auth, transactions, savings, reports, community, chat, ai, p
 async def lifespan(app: FastAPI):
     # Startup
     configure_langsmith()
+    start_scheduler()
     yield
-    # Shutdown (cleanup if needed)
+    # Shutdown
+    stop_scheduler()
 
 
 app = FastAPI(
@@ -22,7 +25,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — all origins/methods/headers come from environment variables
+# CORS — all values from environment variables
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -32,7 +35,6 @@ app.add_middleware(
 )
 
 
-# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -41,13 +43,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Health check
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy", "service": "Lumi API", "version": "1.0.0"}
 
 
-# Register routers
+# Register all routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(savings.router, prefix="/api/v1")
@@ -57,5 +58,3 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
-
-

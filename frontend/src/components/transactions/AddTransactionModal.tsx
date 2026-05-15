@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -15,13 +15,28 @@ interface AddTransactionModalProps {
   onClose: () => void;
   onAdd: (data: CreateTransactionPayload) => Promise<void>;
   currency: string;
+  prefill?: Partial<CreateTransactionPayload> | null;
 }
 
-export default function AddTransactionModal({ isOpen, onClose, onAdd, currency }: AddTransactionModalProps) {
-  const [form, setForm] = useState<CreateTransactionPayload>({
-    amount: 0, type: "expense", category: "food", description: "",
-  });
+const DEFAULT_FORM: CreateTransactionPayload = {
+  amount: 0,
+  type: "expense",
+  category: "food",
+  description: "",
+};
+
+export default function AddTransactionModal({ isOpen, onClose, onAdd, currency, prefill }: AddTransactionModalProps) {
+  const [form, setForm] = useState<CreateTransactionPayload>(DEFAULT_FORM);
   const [isLoading, setIsLoading] = useState(false);
+
+  // When prefill changes (e.g. from scanner), populate the form
+  useEffect(() => {
+    if (prefill) {
+      setForm({ ...DEFAULT_FORM, ...prefill });
+    } else {
+      setForm(DEFAULT_FORM);
+    }
+  }, [prefill, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,14 +45,19 @@ export default function AddTransactionModal({ isOpen, onClose, onAdd, currency }
     try {
       await onAdd(form);
       onClose();
-      setForm({ amount: 0, type: "expense", category: "food", description: "" });
+      setForm(DEFAULT_FORM);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Transaction">
+    <Modal isOpen={isOpen} onClose={onClose} title={prefill ? "Confirm Scanned Transaction" : "Add Transaction"}>
+      {prefill && (
+        <p className="text-xs text-mg-gold bg-mg-gold/10 px-3 py-2 rounded-card border border-mg-gold/20 mb-4">
+          ✦ AI pre-filled this from your scan. Review and adjust before saving.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -91,7 +111,9 @@ export default function AddTransactionModal({ isOpen, onClose, onAdd, currency }
         />
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" className="flex-1" isLoading={isLoading}>Add Transaction</Button>
+          <Button type="submit" variant="primary" className="flex-1" isLoading={isLoading}>
+            {prefill ? "Save Transaction" : "Add Transaction"}
+          </Button>
         </div>
       </form>
     </Modal>
