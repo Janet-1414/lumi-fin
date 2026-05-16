@@ -28,12 +28,21 @@ export function useSavingsGoals() {
     }
   }, []);
 
+  const refreshStreak = useCallback(async () => {
+    try {
+      const s = await api.get<Streak>("/savings/streak");
+      setStreak(s);
+    } catch {}
+  }, []);
+
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const createGoal = async (data: Partial<SavingsGoal>) => {
     const goal = await api.post<SavingsGoal>("/savings/goals", data);
     setGoals((prev) => [goal, ...prev]);
     toast.success("Goal created! 🎯");
+    // Refresh streak immediately — backend updates it on goal create
+    await refreshStreak();
     return goal;
   };
 
@@ -41,6 +50,8 @@ export function useSavingsGoals() {
     const updated = await api.patch<SavingsGoal>(`/savings/goals/${id}`, data);
     setGoals((prev) => prev.map((g) => (g.id === id ? updated : g)));
     toast.success("Goal updated!");
+    // Refresh streak immediately — backend updates it on goal update
+    await refreshStreak();
     return updated;
   };
 

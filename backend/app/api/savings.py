@@ -12,7 +12,7 @@ from app.schemas.savings import (
 from app.services.savings_service import SavingsService
 from app.services.notification_service import NotificationService
 from app.ai.savings_coach import generate_coaching_message
-from app.ai.savings_challenges import generate_challenge
+from app.ai.savings_challenges import generate_challenges
 from app.services.transaction_service import TransactionService  # noqa: F401
 from datetime import date
 
@@ -49,7 +49,6 @@ async def create_goal(
 ):
     service = SavingsService(db)
     goal = await service.create_goal(current_user, data)
-    # Creating a goal counts as activity — update streak
     await service.update_streak(current_user)
     pct = round(float(goal.current_amount) / float(goal.target_amount) * 100, 2) if float(goal.target_amount) > 0 else 0
     return SavingsGoalResponse(
@@ -73,7 +72,6 @@ async def update_goal(
     await service.update_streak(current_user)
     goal = await service.update_goal(current_user, goal_id, data)
 
-    # Notify if goal just completed
     from app.models.savings_goal import GoalStatus
     if goal.status == GoalStatus.COMPLETED:
         await notif_service.create_notification(
@@ -132,7 +130,6 @@ async def checkin_streak(
     notif_service = NotificationService(db)
     streak = await service.update_streak(current_user)
 
-    # Send milestone notifications
     if streak.current_streak == 7:
         await notif_service.create_notification(
             current_user,
@@ -197,14 +194,22 @@ async def get_coaching(
     return {"coaching_message": message, "goal_id": str(goal_id)}
 
 
-# AI Feature #6: Savings Challenges (Pro only)
-@router.post("/challenges/generate", response_model=dict)
+# AI Feature #6: Savings Challenges — returns 3 options (Pro only)
+@router.post("/challenges/generate", response_model=list)
 async def generate_ai_challenge(
     current_user: User = Depends(get_current_pro_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Generates 3 distinct AI savings challenges for the user to choose from."""
     tx_service = TransactionService(db)
     summary = await tx_service.get_summary(current_user, "month")
-    spending_data = f"Monthly expenses: {current_user.currency_code} {summary.total_expenses:,.0f}, Income: {current_user.currency_code} {summary.total_income:,.0f}"
-    challenge = await generate_challenge(current_user.first_name, current_user.currency_code, spending_data)
-    return challenge
+    spending_data = (
+        f"Monthly expenses: {current_user.currency_code} {summary.total_expenses:,.0f}, "
+        f"Income: {current_user.currency_code} {summary.total_income:,.0f}"
+    )
+    challenges = await generate_challenges(
+        current_user.first_name,
+        current_user.currency_code,
+        spending_data,
+    )
+    return challenges

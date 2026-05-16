@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Brain, ChevronRight } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -30,13 +30,45 @@ const PERSONALITY_COLORS: Record<string, string> = {
   "The Hustler": "text-orange-400",
 };
 
-const QUIZ_QUESTIONS = [
+// Large pool of questions — 5 are randomly picked each time the quiz starts
+const ALL_QUESTIONS = [
+  // Spending habits
   "When you receive money, what's the first thing you think about?",
   "You see something you want but can't fully afford. What do you do?",
+  "How do you decide whether to buy something or save the money?",
+  "Describe your last impulse purchase. How did you feel afterwards?",
+  "When you're at Owino market or a shopping centre, how do you decide what to buy?",
+
+  // Savings mindset
   "How do you feel when you check your bank balance?",
   "What does financial success look like to you in 5 years?",
-  "How do you handle unexpected expenses?",
+  "Have you ever had a savings goal? Did you hit it? What happened?",
+  "If someone gave you UGX 500,000 right now, what would you do with it?",
+  "How much of your income do you try to save each month, and does it actually happen?",
+
+  // Financial stress
+  "How do you handle unexpected expenses like a medical bill or phone repair?",
+  "Describe a time when you ran out of money before the end of the month. What caused it?",
+  "When money is tight, what's the first thing you cut from your spending?",
+  "How do you feel when friends invite you somewhere you can't afford?",
+
+  // Financial goals
+  "What's one big financial goal you have right now and what's stopping you from reaching it?",
+  "Do you have an emergency fund? If not, what has prevented you from building one?",
+  "How do you feel about investing? Would you put money in the stock market or a SACCO?",
+  "Where do you see yourself financially in 10 years and what are you doing to get there?",
+
+  // Behaviour and habits
+  "Do you know exactly how much you spent last month? What were your biggest expenses?",
+  "How do you feel about borrowing money from friends or family?",
+  "When you get paid, what happens to your money over the next few days?",
+  "Have you ever regretted a financial decision? What was it and what did you learn?",
 ];
+
+function pickRandomQuestions(count: number = 5): string[] {
+  const shuffled = [...ALL_QUESTIONS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
 
 const RESULT_STORAGE_KEY = "lumi_personality_result";
 
@@ -51,7 +83,9 @@ function loadSavedResult(): any | null {
 
 export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPersonalityBadgeProps) {
   const [mode, setMode] = useState<"idle" | "quiz" | "result">("idle");
-  const [answers, setAnswers] = useState<string[]>(Array(QUIZ_QUESTIONS.length).fill(""));
+  // Pick 5 random questions when component first mounts
+  const [quizQuestions, setQuizQuestions] = useState<string[]>(() => pickRandomQuestions(5));
+  const [answers, setAnswers] = useState<string[]>(Array(5).fill(""));
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<any>(null);
   const [savedResult] = useState<any>(() => loadSavedResult());
@@ -65,6 +99,23 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
     if (toShow) {
       setResult(toShow);
       setMode("result");
+      return;
+    }
+    if (personality) {
+      setResult({
+        personality_type: personality,
+        description: "You've been identified as this money personality type. Retake the quiz to get your full profile with detailed strengths, weaknesses, and personalised advice from Lumi AI.",
+        strengths: [
+          "Goal-oriented and financially self-aware",
+          "Using Lumi to actively track your money",
+          "Taking steps to understand your financial habits",
+        ],
+        weaknesses: [
+          "Retake the quiz to see your specific areas to watch out for",
+        ],
+        advice: `${user?.first_name || "You"}, retake the quiz below to get Lumi's full personalised advice tailored specifically to your money style and East African financial context.`,
+      });
+      setMode("result");
     }
   };
 
@@ -75,7 +126,10 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
     }
     setIsLoading(true);
     try {
-      const data = await api.post<any>("/ai/personality/analyse", { answers });
+      // Send both questions and answers so AI has full context
+      const data = await api.post<any>("/ai/personality/analyse", {
+        answers: answers.map((a, i) => `Q: ${quizQuestions[i]}\nA: ${a}`),
+      });
       setResult(data);
       localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(data));
       if (user) setUser({ ...user, money_personality: data.personality_type });
@@ -88,7 +142,9 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
   };
 
   const resetQuiz = () => {
-    setAnswers(Array(QUIZ_QUESTIONS.length).fill(""));
+    // Pick fresh random questions each time quiz is retaken
+    setQuizQuestions(pickRandomQuestions(5));
+    setAnswers(Array(5).fill(""));
     setStep(0);
     setResult(null);
     setMode("quiz");
@@ -119,12 +175,14 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
                 <p key={i} className="text-sm text-[var(--text-secondary)]">✓ {s}</p>
               ))}
             </div>
+
             <div className="p-3 rounded-card bg-mg-alert/10 border border-mg-alert/20">
               <p className="text-xs font-bold text-mg-alert uppercase tracking-wide mb-2">Watch out for</p>
               {r?.weaknesses?.map((w: string, i: number) => (
                 <p key={i} className="text-sm text-[var(--text-secondary)]">⚠ {w}</p>
               ))}
             </div>
+
             <div className="p-3 rounded-card bg-mg-gold/10 border border-mg-gold/30">
               <p className="text-xs font-bold text-mg-gold uppercase tracking-wide mb-2">Lumi's Advice for You</p>
               <p className="text-sm text-[var(--text-primary)] leading-relaxed">{r?.advice}</p>
@@ -154,17 +212,17 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
         </div>
 
         <div className="flex gap-1 mb-3">
-          {QUIZ_QUESTIONS.map((_, i) => (
+          {quizQuestions.map((_, i) => (
             <div
               key={i}
               className={`flex-1 h-1 rounded-full transition-all ${i <= step ? "bg-mg-gold" : "bg-[var(--border)]"}`}
             />
           ))}
         </div>
-        <p className="text-xs text-[var(--text-muted)] mb-3">Question {step + 1} of {QUIZ_QUESTIONS.length}</p>
+        <p className="text-xs text-[var(--text-muted)] mb-3">Question {step + 1} of {quizQuestions.length}</p>
 
         <p className="text-sm font-semibold text-[var(--text-primary)] leading-relaxed mb-3">
-          {QUIZ_QUESTIONS[step]}
+          {quizQuestions[step]}
         </p>
 
         <textarea
@@ -188,7 +246,7 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
           <Button variant="ghost" size="sm" onClick={() => setMode("idle")}>
             Cancel
           </Button>
-          {step < QUIZ_QUESTIONS.length - 1 ? (
+          {step < quizQuestions.length - 1 ? (
             <Button
               variant="primary"
               size="sm"

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useUser } from "@/hooks/useUser";
 import { useChat } from "@/hooks/useChat";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -21,7 +21,15 @@ interface ChatSession {
 
 function loadSessions(): ChatSession[] {
   try {
-    return JSON.parse(sessionStorage.getItem(SESSIONS_KEY) || "[]");
+    const raw = sessionStorage.getItem(SESSIONS_KEY);
+    if (!raw) return [];
+    const all: ChatSession[] = JSON.parse(raw);
+    const seen = new Set<string>();
+    return all.filter((s) => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    }).filter((s) => s.messages.some((m) => m.role === "user"));
   } catch {
     return [];
   }
@@ -29,7 +37,11 @@ function loadSessions(): ChatSession[] {
 
 function saveSessions(sessions: ChatSession[]) {
   try {
-    sessionStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, MAX_SESSIONS)));
+    const seen = new Set<string>();
+    const deduped = sessions
+      .filter((s) => s.messages.some((m) => m.role === "user"))
+      .filter((s) => { if (seen.has(s.id)) return false; seen.add(s.id); return true; });
+    sessionStorage.setItem(SESSIONS_KEY, JSON.stringify(deduped.slice(0, MAX_SESSIONS)));
   } catch {}
 }
 
@@ -46,58 +58,69 @@ export default function ChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const isPro = user?.subscription_tier === "pro";
 
-  // Track if this session has been saved before to avoid ghost entries
-  const hasSavedRef = useRef(false);
+  // Track whether we are in a loaded (read-only) session or an active one
+  const sessionIdRef = useRef<string | null>(null);
   const isLoadedSessionRef = useRef(false);
 
-  // Only save session when there are actual messages from the user
-  // and this isn't just loading a previous session
-  useEffect(() => {
-    const hasUserMessage = messages.some((m) => m.role === "user");
-    if (!hasUserMessage) return;
-    if (isLoadedSessionRef.current) return;
+  // Called only when user sends a message — not on page load
+  const handleSend = useCallback(async (content: string) => {
+    // Mark that we are now in an active session (not loaded)
+    isLoadedSessionRef.current = false;
 
-    const sessionId = activeSessionId || (() => {
-      const id = Date.now().toString();
-      setActiveSessionId(id);
-      return id;
-    })();
+    // Create session ID once per conversation
+    if (!sessionIdRef.current) {
+      const newId = Date.now().toString();
+      sessionIdRef.current = newId;
+      setActiveSessionId(newId);
+    }
 
-    const updatedSession: ChatSession = {
-      id: sessionId,
-      title: getSessionTitle(messages),
-      messages,
-      created_at: new Date().toISOString(),
-    };
+    await sendMessage(content);
 
-    setSessions((prev) => {
-      const existing = prev.find((s) => s.id === sessionId);
-      const updated = existing
-        ? prev.map((s) => (s.id === sessionId ? updatedSession : s))
-        : [updatedSession, ...prev];
-      const deduped = updated.filter(
-        (s, i, arr) => arr.findIndex((x) => x.id === s.id) === i
-      );
-      saveSessions(deduped);
-      return deduped;
-    });
+    // Save after send — read messages from the hook via a small timeout
+    // so the state has updated
+    setTimeout(() => {
+      if (isLoadedSessionRef.current) return;
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) return;
 
-    hasSavedRef.current = true;
-  }, [messages]);
+      // Re-read from sessionStorage to get the latest messages
+      try {
+        const stored = sessionStorage.getItem("lumi_chat_current");
+        if (!stored) return;
+        const latestMessages: ChatMessage[] = JSON.parse(stored);
+        if (!latestMessages.some((m) => m.role === "user")) return;
+
+        const updatedSession: ChatSession = {
+          id: sessionId,
+          title: getSessionTitle(latestMessages),
+          messages: latestMessages,
+          created_at: new Date().toISOString(),
+        };
+
+        setSessions((prev) => {
+          const exists = prev.some((s) => s.id === sessionId);
+          const updated = exists
+            ? prev.map((s) => (s.id === sessionId ? updatedSession : s))
+            : [updatedSession, ...prev];
+          saveSessions(updated);
+          return updated;
+        });
+      } catch {}
+    }, 200);
+  }, [sendMessage, sessionIdRef]);
 
   const handleNewChat = () => {
     isLoadedSessionRef.current = false;
-    hasSavedRef.current = false;
+    sessionIdRef.current = null;
     clearChat();
     setActiveSessionId(null);
   };
 
   const handleLoadSession = (session: ChatSession) => {
     isLoadedSessionRef.current = true;
+    sessionIdRef.current = session.id;
     setMessages(session.messages);
     setActiveSessionId(session.id);
-    // Reset after a tick so future sends in this session save correctly
-    setTimeout(() => { isLoadedSessionRef.current = false; }, 100);
   };
 
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
@@ -105,10 +128,7 @@ export default function ChatPage() {
     const updated = sessions.filter((s) => s.id !== id);
     setSessions(updated);
     saveSessions(updated);
-    if (activeSessionId === id) {
-      clearChat();
-      setActiveSessionId(null);
-    }
+    if (activeSessionId === id) handleNewChat();
   };
 
   if (!user) return null;
@@ -132,7 +152,6 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-140px)] lg:h-[calc(100vh-60px)] gap-4">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-56 flex-shrink-0">
         <button
           onClick={handleNewChat}
@@ -176,7 +195,6 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {/* Chat area */}
       <div className="flex-1 flex flex-col glass-card overflow-hidden">
         <div className="lg:hidden flex items-center justify-between p-3 border-b border-[var(--border)]">
           <p className="text-sm font-semibold text-[var(--text-primary)]">Lumi AI</p>
@@ -191,8 +209,8 @@ export default function ChatPage() {
         <ChatWindow messages={messages} isStreaming={isStreaming} userName={user.first_name} />
 
         <div className="p-4 border-t border-[var(--border)]">
-          {messages.length === 0 && <PromptChips onSelect={sendMessage} />}
-          <ChatInput onSend={sendMessage} onStop={stopStreaming} isStreaming={isStreaming} />
+          {messages.length === 0 && <PromptChips onSelect={handleSend} />}
+          <ChatInput onSend={handleSend} onStop={stopStreaming} isStreaming={isStreaming} />
         </div>
       </div>
     </div>

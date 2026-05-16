@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Sparkles, CheckCircle, X, Check } from "lucide-react";
+import { Sparkles, CheckCircle, X, Check, AlertTriangle } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
@@ -13,11 +13,12 @@ interface Challenge {
   duration_days: number;
   target_amount: number | null;
   tips: string[];
+  difficulty?: string;
 }
 
 interface ActiveChallenge extends Challenge {
   accepted_at: string;
-  checked_in_dates: string[]; // ISO date strings of days checked in
+  checked_in_dates: string[];
 }
 
 interface SavingsChallengeCardProps {
@@ -27,12 +28,17 @@ interface SavingsChallengeCardProps {
 
 const STORAGE_KEY = "lumi_active_challenge";
 
+const DIFFICULTY_COLORS: Record<string, string> = {
+  Easy: "text-mg-success bg-mg-success/10 border-mg-success/30",
+  Medium: "text-mg-gold bg-mg-gold/10 border-mg-gold/30",
+  Ambitious: "text-mg-alert bg-mg-alert/10 border-mg-alert/30",
+};
+
 function loadActiveChallenge(): ActiveChallenge | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored);
-    // Ensure checked_in_dates always exists — handles old data gracefully
     if (!Array.isArray(parsed.checked_in_dates)) {
       parsed.checked_in_dates = [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
@@ -42,12 +48,6 @@ function loadActiveChallenge(): ActiveChallenge | null {
     localStorage.removeItem(STORAGE_KEY);
     return null;
   }
-}
-
-function saveActiveChallenge(challenge: ActiveChallenge) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(challenge));
-  } catch {}
 }
 
 function getTodayString(): string {
@@ -60,8 +60,26 @@ function getDaysElapsed(acceptedAt: string): number {
   return Math.floor((today.getTime() - accepted.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function getMissedConsecutiveDays(challenge: ActiveChallenge): number {
+  const daysElapsed = getDaysElapsed(challenge.accepted_at);
+  if (daysElapsed === 0) return 0;
+
+  let consecutive = 0;
+  for (let i = daysElapsed; i >= 1; i--) {
+    const d = new Date(challenge.accepted_at);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+    if (!challenge.checked_in_dates.includes(dateStr)) {
+      consecutive++;
+    } else {
+      break;
+    }
+  }
+  return consecutive;
+}
+
 export default function SavingsChallengeCard({ isPro, currency }: SavingsChallengeCardProps) {
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [options, setOptions] = useState<Challenge[]>([]);
   const [activeChallenge, setActiveChallenge] = useState<ActiveChallenge | null>(loadActiveChallenge);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -74,18 +92,30 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
     : 0;
   const daysLeft = activeChallenge ? Math.max(0, activeChallenge.duration_days - daysElapsed) : 0;
   const isComplete = activeChallenge ? checkedInCount >= activeChallenge.duration_days : false;
+  const missedDays = activeChallenge ? getMissedConsecutiveDays(activeChallenge) : 0;
 
+  // Auto-abandon if 2+ consecutive days missed
   useEffect(() => {
-    if (activeChallenge && isComplete) {
-      toast.success(`You completed "${activeChallenge.title}"! 🎉`, { duration: 6000 });
+    if (activeChallenge && missedDays >= 2) {
+      toast.error(
+        `Challenge abandoned — you missed ${missedDays} days in a row. Generate a new one and try again!`,
+        { duration: 6000 }
+      );
+      localStorage.removeItem(STORAGE_KEY);
+      setActiveChallenge(null);
     }
   }, []);
 
   const generate = async () => {
     setIsLoading(true);
+    setOptions([]);
     try {
-      const data = await api.post<Challenge>("/savings/challenges/generate");
-      setChallenge(data);
+      const data = await api.post<Challenge[]>("/savings/challenges/generate");
+      if (Array.isArray(data) && data.length > 0) {
+        setOptions(data);
+      } else {
+        toast.error("Could not generate challenges. Try again.");
+      }
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -93,17 +123,16 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
     }
   };
 
-  const handleAccept = () => {
-    if (!challenge) return;
+  const handleAccept = (challenge: Challenge) => {
     const active: ActiveChallenge = {
       ...challenge,
       accepted_at: new Date().toISOString(),
       checked_in_dates: [],
     };
-    saveActiveChallenge(active);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(active));
     setActiveChallenge(active);
-    setChallenge(null);
-    toast.success(`Challenge accepted! Check in daily to track your progress 🔥`);
+    setOptions([]);
+    toast.success(`Challenge accepted! Check in daily to keep it alive 🔥`);
   };
 
   const handleCheckIn = () => {
@@ -112,9 +141,9 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
       ...activeChallenge,
       checked_in_dates: [...activeChallenge.checked_in_dates, today],
     };
-    saveActiveChallenge(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     setActiveChallenge(updated);
-    toast.success("Daily check-in recorded! Keep it up 💪");
+    toast.success("Day checked in! Keep going 💪");
   };
 
   const handleAbandon = () => {
@@ -126,11 +155,11 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
   const handleComplete = () => {
     localStorage.removeItem(STORAGE_KEY);
     setActiveChallenge(null);
-    toast.success("Amazing work! Challenge complete 🏆");
+    toast.success("Amazing! Challenge complete 🏆");
   };
 
   const formatAmount = (amount: number | null) => {
-    if (!amount || amount === 0) return "No specific target";
+    if (!amount || amount === 0) return null;
     return `${currency} ${Number(amount).toLocaleString()}`;
   };
 
@@ -154,13 +183,25 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
           <div className="text-center py-2 space-y-3">
             <CheckCircle size={36} className="text-mg-success mx-auto" />
             <p className="font-semibold text-mg-success text-base">Challenge Complete! 🎉</p>
-            <p className="text-xs text-[var(--text-muted)]">You checked in {checkedInCount} days for "{activeChallenge.title}"</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              You checked in {checkedInCount} times for "{activeChallenge.title}"
+            </p>
             <Button size="sm" variant="primary" className="w-full" onClick={handleComplete}>
               Claim & Start New
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Miss warning */}
+            {missedDays === 1 && !hasCheckedInToday && (
+              <div className="flex items-center gap-2 p-2 rounded-card bg-mg-alert/10 border border-mg-alert/30">
+                <AlertTriangle size={14} className="text-mg-alert flex-shrink-0" />
+                <p className="text-xs text-mg-alert">
+                  ⚠️ You missed yesterday! Miss one more day and the challenge auto-abandons.
+                </p>
+              </div>
+            )}
+
             <p className="font-semibold text-mg-gold text-sm">{activeChallenge.title}</p>
             <p className="text-xs text-[var(--text-secondary)]">{activeChallenge.description}</p>
 
@@ -174,11 +215,11 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
               <ProgressBar value={progressPct} color="gold" size="md" />
               <p className="text-xs text-[var(--text-muted)] mt-1">
                 {daysLeft === 0 ? "Last day today!" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining`}
-                {activeChallenge.target_amount ? ` · ${formatAmount(activeChallenge.target_amount)}` : ""}
+                {formatAmount(activeChallenge.target_amount) ? ` · ${formatAmount(activeChallenge.target_amount)}` : ""}
               </p>
             </div>
 
-            {/* Daily check-in button */}
+            {/* Daily check-in */}
             <button
               onClick={handleCheckIn}
               disabled={hasCheckedInToday}
@@ -206,56 +247,76 @@ export default function SavingsChallengeCard({ isPro, currency }: SavingsChallen
     );
   }
 
-  // ── Generated challenge pending accept/skip
-  if (challenge) {
+  // ── 3 challenge options to choose from
+  if (options.length > 0) {
     return (
-      <Card glow>
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={18} className="text-mg-gold" />
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Savings Challenge</h3>
-        </div>
-        <div className="space-y-2">
-          <p className="font-semibold text-mg-gold">{challenge.title}</p>
-          <p className="text-sm text-[var(--text-secondary)]">{challenge.description}</p>
-          <p className="text-xs text-[var(--text-muted)]">
-            {challenge.duration_days} days · {formatAmount(challenge.target_amount)}
-          </p>
-          {challenge.tips?.length > 0 && (
-            <div className="space-y-1 pt-1">
-              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Tips</p>
-              {challenge.tips.map((tip, i) => (
-                <p key={i} className="text-xs text-[var(--text-secondary)]">· {tip}</p>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <Button size="sm" variant="primary" className="flex-1" onClick={handleAccept}>Accept 🎯</Button>
-            <Button size="sm" variant="ghost" className="flex-1" onClick={() => setChallenge(null)}>Skip</Button>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={18} className="text-mg-gold" />
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Choose a Challenge</h3>
           </div>
-          <Button size="sm" variant="secondary" className="w-full text-xs" onClick={generate} isLoading={isLoading}>
-            Generate another
-          </Button>
+          <button onClick={() => setOptions([])} className="text-xs text-[var(--text-muted)] hover:text-mg-alert">
+            Cancel
+          </button>
         </div>
-      </Card>
+
+        {options.map((challenge, i) => (
+          <Card key={i} className="border border-[var(--border)] hover:border-mg-gold/40 transition-all">
+            <div className="flex items-start justify-between mb-2">
+              <p className="font-semibold text-[var(--text-primary)] text-sm flex-1 pr-2">{challenge.title}</p>
+              {challenge.difficulty && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${DIFFICULTY_COLORS[challenge.difficulty] || DIFFICULTY_COLORS.Easy}`}>
+                  {challenge.difficulty}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] mb-2 leading-relaxed">{challenge.description}</p>
+            <p className="text-xs text-[var(--text-muted)] mb-3">
+              {challenge.duration_days} days
+              {formatAmount(challenge.target_amount) ? ` · Target: ${formatAmount(challenge.target_amount)}` : ""}
+            </p>
+            {challenge.tips?.length > 0 && (
+              <div className="mb-3 space-y-0.5">
+                {challenge.tips.slice(0, 2).map((tip, j) => (
+                  <p key={j} className="text-xs text-[var(--text-muted)]">· {tip}</p>
+                ))}
+              </div>
+            )}
+            <Button size="sm" variant="primary" className="w-full" onClick={() => handleAccept(challenge)}>
+              Accept This Challenge 🎯
+            </Button>
+          </Card>
+        ))}
+
+        <Button size="sm" variant="secondary" className="w-full" onClick={generate} isLoading={isLoading}>
+          Generate 3 new options
+        </Button>
+      </div>
     );
   }
 
-  // ── Default
+  // ── Default — no challenge yet
   return (
     <Card glow>
       <div className="flex items-center gap-2 mb-3">
         <Sparkles size={18} className="text-mg-gold" />
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Savings Challenge</h3>
         {!isPro && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-mg-gold/20 text-mg-gold border border-mg-gold/30">PRO</span>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-mg-gold/20 text-mg-gold border border-mg-gold/30">
+            PRO
+          </span>
         )}
       </div>
       <div className="text-center py-4">
-        <p className="text-sm text-[var(--text-muted)] mb-3">
-          Let Lumi AI generate a personalised savings challenge based on your spending habits
+        <p className="text-sm text-[var(--text-muted)] mb-1">
+          Get 3 personalised challenge options based on your spending habits
+        </p>
+        <p className="text-xs text-[var(--text-muted)] mb-4">
+          Easy · Medium · Ambitious — pick the one that fits your life
         </p>
         <Button size="sm" variant="primary" onClick={generate} isLoading={isLoading} disabled={!isPro}>
-          Generate Challenge
+          Generate 3 Challenges
         </Button>
       </div>
     </Card>

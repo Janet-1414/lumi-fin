@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNotificationStore } from "@/store/notificationStore";
 import { markRead, markAllRead } from "@/lib/notifications";
@@ -10,6 +10,7 @@ import Spinner from "@/components/ui/Spinner";
 import { formatDistanceToNow } from "date-fns";
 import type { Notification } from "@/types/api";
 import { clsx } from "clsx";
+import toast from "react-hot-toast";
 
 const TYPE_ICONS: Record<string, string> = {
   spending_alert: "⚠️",
@@ -23,14 +24,21 @@ const TYPE_ICONS: Record<string, string> = {
   challenge_update: "💪",
 };
 
+// Convert UTC timestamp from backend to local time for display
+function toLocalDate(utcString: string): Date {
+  // Backend stores as UTC without Z suffix — add Z so browser parses correctly
+  const normalized = utcString.endsWith("Z") ? utcString : utcString + "Z";
+  return new Date(normalized);
+}
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { markRead: markReadStore, markAllRead: markAllReadStore } = useNotificationStore();
+  const { markRead: markReadStore, markAllRead: markAllReadStore, setNotifications: setStoreNotifs } = useNotificationStore();
 
   useEffect(() => {
     api.get<Notification[]>("/notifications")
-      .then(setNotifications)
+      .then((data) => { setNotifications(data); setStoreNotifs(data); })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
@@ -47,6 +55,27 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Notification deleted");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await api.delete("/notifications/all");
+      setNotifications([]);
+      markAllReadStore();
+      toast.success("All notifications cleared");
+    } catch {
+      toast.error("Failed to clear notifications");
+    }
+  };
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
@@ -60,11 +89,19 @@ export default function NotificationsPage() {
             </span>
           )}
         </div>
-        {unreadCount > 0 && (
-          <Button size="sm" variant="ghost" onClick={handleMarkAllRead}>
-            <CheckCheck size={14} />
-            Mark all read
-          </Button>
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Button size="sm" variant="ghost" onClick={handleMarkAllRead}>
+                <CheckCheck size={14} />
+                Mark all read
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={handleClearAll}>
+              <Trash2 size={14} />
+              Clear all
+            </Button>
+          </div>
         )}
       </div>
 
@@ -76,7 +113,7 @@ export default function NotificationsPage() {
             <Bell size={40} className="text-[var(--text-muted)] mx-auto mb-3" />
             <p className="text-sm font-medium text-[var(--text-primary)]">No notifications yet</p>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              Lumi will notify you about spending alerts, savings milestones, and AI insights
+              Lumi notifies you 6 times a day — morning, midday, afternoon, evening, and more
             </p>
           </div>
         </Card>
@@ -86,7 +123,7 @@ export default function NotificationsPage() {
             <div
               key={n.id}
               className={clsx(
-                "flex items-start gap-3 p-4 rounded-card border transition-all",
+                "flex items-start gap-3 p-4 rounded-card border transition-all group",
                 n.is_read
                   ? "bg-[var(--bg-card)] border-[var(--border)]"
                   : "bg-mg-gold/5 border-mg-gold/30"
@@ -99,18 +136,27 @@ export default function NotificationsPage() {
                 </p>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">{n.message}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                  {formatDistanceToNow(toLocalDate(n.created_at), { addSuffix: true })}
                 </p>
               </div>
-              {!n.is_read && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {!n.is_read && (
+                  <button
+                    onClick={() => handleMarkRead(n.id)}
+                    className="text-[var(--text-muted)] hover:text-mg-gold transition-colors p-1"
+                    title="Mark as read"
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
                 <button
-                  onClick={() => handleMarkRead(n.id)}
-                  className="text-[var(--text-muted)] hover:text-mg-gold transition-colors flex-shrink-0"
-                  title="Mark as read"
+                  onClick={() => handleDelete(n.id)}
+                  className="text-[var(--text-muted)] hover:text-mg-alert transition-colors p-1 opacity-0 group-hover:opacity-100"
+                  title="Delete"
                 >
-                  <Check size={16} />
+                  <X size={14} />
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>
