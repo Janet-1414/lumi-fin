@@ -30,7 +30,6 @@ async def test_create_post_requires_pro(auth_client: AsyncClient):
         "is_anonymous": True,
         "savings_percentage": 20.0,
     })
-    # Free user should get 403 Forbidden
     assert response.status_code == 403
 
 
@@ -51,7 +50,6 @@ async def test_leaderboard_no_real_amounts(auth_client: AsyncClient):
     for entry in response.json():
         assert "goal_completion_percentage" in entry
         assert "display_name" in entry
-        # These fields must NOT be present
         assert "amount" not in entry
         assert "income" not in entry
         assert "savings_amount" not in entry
@@ -66,12 +64,12 @@ async def test_community_pulse_requires_pro(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_like_post_requires_pro(auth_client: AsyncClient, db: AsyncSession):
+async def test_like_post_requires_pro(auth_client: AsyncClient, db: AsyncSession, test_user: User):
     """Liking posts requires Lumi Pro."""
-    # Create a post directly in DB
+    # Use test_user.id — foreign key must reference an existing user
     post = CommunityPost(
         id=uuid.uuid4(),
-        user_id=uuid.uuid4(),  # different user
+        user_id=test_user.id,
         post_type=PostType.WIN,
         content="Test win post",
         is_anonymous=True,
@@ -85,12 +83,12 @@ async def test_like_post_requires_pro(auth_client: AsyncClient, db: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_feed_post_anonymity(auth_client: AsyncClient, db: AsyncSession):
+async def test_feed_post_anonymity(auth_client: AsyncClient, db: AsyncSession, test_user: User):
     """Posts in the feed must never expose real user identity."""
-    # Seed a post
+    # Use test_user.id — foreign key must reference an existing user
     post = CommunityPost(
         id=uuid.uuid4(),
-        user_id=uuid.uuid4(),
+        user_id=test_user.id,
         post_type=PostType.WIN,
         content="Just hit my savings goal!",
         is_anonymous=True,
@@ -103,11 +101,7 @@ async def test_feed_post_anonymity(auth_client: AsyncClient, db: AsyncSession):
     assert response.status_code == 200
 
     for p in response.json():
-        # display_name must be anonymous — never a real name
         assert p["display_name"] in ("Anonymous Saver", "Community Member")
-        # Real user_id must not be exposed
-        assert "user_id" not in p or p.get("user_id") is None or True  # user_id is internal only
-        # No actual money amounts
         assert "income" not in p
         assert "actual_amount" not in p
 

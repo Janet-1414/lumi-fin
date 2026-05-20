@@ -1,8 +1,8 @@
 "use client";
-import { clsx } from "clsx";
 
-const TABS = ["Feed", "Challenges", "Leaderboard", "Tips"] as const;
-export type CommunityTab = typeof TABS[number];
+export type CommunityTab = "Feed" | "Leaderboard" | "Challenges";
+
+const TABS: CommunityTab[] = ["Feed", "Leaderboard", "Challenges"];
 
 interface CommunityTabsProps {
   active: CommunityTab;
@@ -11,13 +11,16 @@ interface CommunityTabsProps {
 
 export default function CommunityTabs({ active, onChange }: CommunityTabsProps) {
   return (
-    <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
+    <div className="flex gap-1 p-1 rounded-card bg-[var(--bg-secondary)] border border-[var(--border)]">
       {TABS.map((tab) => (
         <button
-          key={tab} onClick={() => onChange(tab)}
-          className={clsx("px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all -mb-px",
-            active === tab ? "border-mg-gold text-mg-gold" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          )}
+          key={tab}
+          onClick={() => onChange(tab)}
+          className={`flex-1 py-2 rounded-card text-sm font-medium transition-all ${
+            active === tab
+              ? "bg-[var(--bg-card)] text-mg-gold shadow-sm border border-[var(--border)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          }`}
         >
           {tab}
         </button>

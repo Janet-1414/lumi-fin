@@ -1,5 +1,6 @@
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
+from app.main import app
 
 
 @pytest.mark.asyncio
@@ -46,7 +47,7 @@ async def test_negative_amount_rejected(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_no_cross_user_access(auth_client: AsyncClient, client: AsyncClient):
+async def test_no_cross_user_access(auth_client: AsyncClient):
     """Users should never be able to access another user's transactions."""
     create_resp = await auth_client.post("/api/v1/transactions", json={
         "amount": 10000,
@@ -56,6 +57,7 @@ async def test_no_cross_user_access(auth_client: AsyncClient, client: AsyncClien
     })
     tx_id = create_resp.json()["id"]
 
-    # Unauthenticated client tries to access
-    response = await client.get(f"/api/v1/transactions/{tx_id}")
-    assert response.status_code == 401
+    # Use a completely fresh client with no cookies — truly unauthenticated
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as fresh_client:
+        response = await fresh_client.get(f"/api/v1/transactions/{tx_id}")
+        assert response.status_code == 401

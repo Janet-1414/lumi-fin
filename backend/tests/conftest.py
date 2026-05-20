@@ -4,14 +4,15 @@ from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy import text
 from app.main import app
 from app.db.database import get_db
 from app.db.base import Base
 from app.models.user import User
 from app.models.savings_goal import SavingsGoal
-from app.models.streak import Streak 
+from app.models.streak import Streak
 
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/lumi_test"
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5433/lumi_test"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 TestSessionLocal = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
@@ -40,6 +41,7 @@ def event_loop():
 @pytest.fixture(scope="session", autouse=True)
 async def setup_db():
     async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with test_engine.begin() as conn:
@@ -63,6 +65,11 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 async def test_user(db: AsyncSession) -> User:
     from app.core.security import hash_password
     import uuid
+
+    # Delete existing test user to avoid duplicate email errors across tests
+    await db.execute(text("DELETE FROM users WHERE email = 'nakato@test.com'"))
+    await db.commit()
+
     user = User(
         id=uuid.uuid4(),
         first_name="Nakato",

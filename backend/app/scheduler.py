@@ -10,6 +10,7 @@ Daily schedule:
   20:00 — Evening savings encouragement
   23:30 — Streak warning before midnight
 """
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select, func, extract
@@ -25,7 +26,9 @@ import random
 import logging
 
 logger = logging.getLogger(__name__)
-scheduler = AsyncIOScheduler(timezone="Africa/Nairobi")
+
+EAT = pytz.timezone("Africa/Nairobi")
+scheduler = AsyncIOScheduler(timezone=EAT)
 
 
 async def _notify(
@@ -48,7 +51,7 @@ async def _notify(
 async def morning_greeting() -> None:
     logger.info("Sending morning greetings...")
 
-    MORNING_INTENTIONS = [
+    MORNING_INTENTIONS = [  # noqa
         "Today is a new chance to make a smart money decision. What's one thing you can do differently today?",
         "Every shilling you save today is a step closer to your goals. Start strong!",
         "Financial freedom starts with small daily decisions. Make today count.",
@@ -58,7 +61,7 @@ async def morning_greeting() -> None:
         "The best time to save was yesterday. The second best time is right now.",
     ]
 
-    GREETINGS = [
+    GREETINGS = [  # noqa
         "Good morning", "Rise and shine", "Hello", "Good morning",
         "A new day begins", "Morning", "Good morning",
     ]
@@ -93,7 +96,7 @@ async def morning_greeting() -> None:
 async def midday_check() -> None:
     logger.info("Running midday spending check...")
 
-    ENCOURAGEMENTS = [
+    ENCOURAGEMENTS = [  # noqa
         "You're doing great — keep tracking every expense!",
         "Halfway through the day. Stay mindful of your spending.",
         "Every transaction you log brings you closer to financial clarity.",
@@ -158,7 +161,7 @@ async def midday_check() -> None:
 async def afternoon_tip() -> None:
     logger.info("Sending afternoon tips...")
 
-    TIPS = [
+    TIPS = [  # noqa
         ("Budget your airtime", "Before buying airtime, ask — do I really need this much right now? Buying in bulk usually saves money over daily top-ups."),
         ("The boda boda trap", "Boda rides are convenient but expensive over time. Walking 10 minutes instead of riding once a day saves thousands per month."),
         ("Mobile Money fees", "Plan your withdrawals in bulk. Withdrawing UGX 100,000 once costs far less in fees than withdrawing UGX 10,000 ten times."),
@@ -230,7 +233,6 @@ async def evening_summary() -> None:
                 balance = income - expenses
 
                 if income == 0 and expenses == 0:
-                    # No data yet — send generic encouragement
                     await _notify(
                         session, user.id,
                         NotificationType.WEEKLY_REPORT,
@@ -241,7 +243,6 @@ async def evening_summary() -> None:
 
                 savings_rate = round((balance / income * 100), 1) if income > 0 else 0
 
-                # Build message based on how they're doing
                 if savings_rate >= 20:
                     verdict = f"Excellent! You're saving {savings_rate}% of your income this month — well above the recommended 20%."
                 elif savings_rate >= 10:
@@ -249,7 +250,7 @@ async def evening_summary() -> None:
                 elif savings_rate > 0:
                     verdict = f"You're saving {savings_rate}% this month. There's room to improve — try cutting one expense tomorrow."
                 else:
-                    verdict = f"Your expenses are exceeding your income this month. Let's work on reducing spending starting tomorrow."
+                    verdict = "Your expenses are exceeding your income this month. Let's work on reducing spending starting tomorrow."
 
                 await _notify(
                     session, user.id,
@@ -262,7 +263,6 @@ async def evening_summary() -> None:
                     ),
                 )
 
-                # Separate budget warning if overspending
                 if income > 0 and expenses >= income * 0.9:
                     await _notify(
                         session, user.id,
@@ -281,7 +281,7 @@ async def evening_summary() -> None:
 async def savings_encouragement() -> None:
     logger.info("Sending savings encouragement...")
 
-    MESSAGES = [
+    MESSAGES = [  # noqa
         "Every shilling you don't spend tonight is a shilling working for your future.",
         "Before bed — did you save anything today? Even a small amount counts.",
         "Your savings goals are waiting. How much closer did you get today?",
@@ -299,7 +299,6 @@ async def savings_encouragement() -> None:
         )
         for user, streak in result.all():
             try:
-                # Check active goals
                 goals_res = await session.execute(
                     select(func.count(SavingsGoal.id)).where(
                         SavingsGoal.user_id == user.id,
@@ -338,28 +337,35 @@ async def streak_warning() -> None:
         )
         for user, streak in result.all():
             try:
-                # Hasn't checked in today — warn them
-                if streak.last_activity_date != today and streak.current_streak > 0:
+                # Case 1: Has streak but hasn't checked in today — warn them
+                if (
+                    streak.current_streak > 0
+                    and streak.last_activity_date is not None
+                    and streak.last_activity_date < today
+                    and streak.last_activity_date >= yesterday
+                ):
                     await _notify(
                         session, user.id,
                         NotificationType.STREAK_REMINDER,
-                        title=f"🔥 {user.first_name}, 30 minutes to save your streak!",
-                        message=f"Your {streak.current_streak}-day streak expires at midnight. Add any transaction or update a savings goal right now to keep it alive!",
+                        title=f"🔥 {user.first_name}, 30 minutes to save your {streak.current_streak}-day streak!",
+                        message=f"Your streak expires at midnight EAT. Add any transaction or update a savings goal right now to keep it alive!",
                     )
 
-                # Missed yesterday — reset streak
-                if (
-                    streak.last_activity_date is not None
+                # Case 2: Missed yesterday entirely — reset streak
+                elif (
+                    streak.current_streak > 0
+                    and streak.last_activity_date is not None
                     and streak.last_activity_date < yesterday
-                    and streak.current_streak > 0
                 ):
                     old = streak.current_streak
                     streak.current_streak = 0
+                    # Update last_activity_date so this reset never fires again
+                    streak.last_activity_date = today
                     await _notify(
                         session, user.id,
                         NotificationType.STREAK_REMINDER,
-                        title=f"💔 {user.first_name}, your streak has reset",
-                        message=f"Your {old}-day streak ended because you missed a day. Don't worry — every champion starts over sometimes. Begin your new streak today!",
+                        title=f"💔 {user.first_name}, your {old}-day streak has reset",
+                        message=f"Your streak ended because you missed a day. Don't worry — every champion starts over sometimes. Begin your new streak today!",
                     )
 
             except Exception as e:
@@ -431,65 +437,65 @@ async def goals_deadline_check() -> None:
 def start_scheduler() -> None:
     """Register all jobs and start the scheduler."""
 
-    # 07:00 — Morning greeting
+    # 07:00 EAT — Morning greeting
     scheduler.add_job(
         morning_greeting,
-        CronTrigger(hour=7, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=7, minute=0, timezone=EAT),
         id="morning_greeting", replace_existing=True,
     )
 
-    # 09:00 — Goals deadline check
+    # 09:00 EAT — Goals deadline check
     scheduler.add_job(
         goals_deadline_check,
-        CronTrigger(hour=9, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=9, minute=0, timezone=EAT),
         id="goals_check", replace_existing=True,
     )
 
-    # 12:00 — Midday spending check
+    # 12:00 EAT — Midday spending check
     scheduler.add_job(
         midday_check,
-        CronTrigger(hour=12, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=12, minute=0, timezone=EAT),
         id="midday_check", replace_existing=True,
     )
 
-    # 15:00 — Afternoon financial tip
+    # 15:00 EAT — Afternoon financial tip
     scheduler.add_job(
         afternoon_tip,
-        CronTrigger(hour=15, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=15, minute=0, timezone=EAT),
         id="afternoon_tip", replace_existing=True,
     )
 
-    # 18:00 — Evening summary + budget alerts
+    # 18:00 EAT — Evening summary + budget alerts
     scheduler.add_job(
         evening_summary,
-        CronTrigger(hour=18, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=18, minute=0, timezone=EAT),
         id="evening_summary", replace_existing=True,
     )
 
-    # 20:00 — Savings encouragement
+    # 20:00 EAT — Savings encouragement
     scheduler.add_job(
         savings_encouragement,
-        CronTrigger(hour=20, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(hour=20, minute=0, timezone=EAT),
         id="savings_encouragement", replace_existing=True,
     )
 
-    # 23:30 — Streak warning before midnight
+    # 23:30 EAT — Streak warning before midnight
     scheduler.add_job(
         streak_warning,
-        CronTrigger(hour=23, minute=30, timezone="Africa/Nairobi"),
+        CronTrigger(hour=23, minute=30, timezone=EAT),
         id="streak_warning", replace_existing=True,
     )
 
-    # Monday 07:00 — Weekly report
+    # Monday 07:00 EAT — Weekly report
     scheduler.add_job(
         weekly_report,
-        CronTrigger(day_of_week="mon", hour=7, minute=0, timezone="Africa/Nairobi"),
+        CronTrigger(day_of_week="mon", hour=7, minute=0, timezone=EAT),
         id="weekly_report", replace_existing=True,
     )
 
     scheduler.start()
     logger.info(
-        "Lumi scheduler started — 7 daily jobs active:\n"
+        "Lumi scheduler started (EAT timezone enforced via pytz):\n"
         "  07:00 Morning greeting\n"
         "  09:00 Goals deadline check\n"
         "  12:00 Midday spending check\n"
