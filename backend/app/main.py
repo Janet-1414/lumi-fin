@@ -10,11 +10,9 @@ from app.api import auth, transactions, savings, reports, community, chat, ai, p
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     configure_langsmith()
     start_scheduler()
     yield
-    # Shutdown
     stop_scheduler()
 
 
@@ -25,7 +23,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — all values from environment variables
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -48,7 +45,6 @@ async def health():
     return {"status": "healthy", "service": "Lumi API", "version": "1.0.0"}
 
 
-# Register all routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(savings.router, prefix="/api/v1")
