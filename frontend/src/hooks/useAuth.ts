@@ -10,12 +10,15 @@ export function useAuth() {
 
   useEffect(() => {
     const fetchUser = async () => {
+      setLoading(true);
       try {
         const me = await getMe();
         setUser(me);
         setTheme(me.theme);
       } catch {
         clearAuth();
+      } finally {
+        setLoading(false);
       }
     };
     fetchUser();

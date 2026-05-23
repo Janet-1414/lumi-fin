@@ -193,7 +193,7 @@ export default function MoneyPersonalityBadge({ personality, isPro }: MoneyPerso
             <Button size="sm" variant="primary" className="flex-1" onClick={resetQuiz}>
               Retake Quiz
             </Button>
-            <Button size="sm" variant="secondary" className="flex-1" onClick={() => setMode("idle")}>
+            <Button size="sm" variant="ghost" className="flex-1" onClick={() => setMode("idle")}>
               Close
             </Button>
           </div>

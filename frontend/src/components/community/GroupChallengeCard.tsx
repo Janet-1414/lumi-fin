@@ -27,7 +27,12 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 const ACTIVE_CHALLENGE_KEY = "lumi_active_challenge";
 
 function getTodayString(): string {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  // Use local date not UTC — important for EAT timezone (UTC+3)
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getPersonalProgress(challengeId: string): { checkedIn: number; hasCheckedInToday: boolean } | null {
@@ -104,7 +109,9 @@ export default function GroupChallengeCard({
         </span>
         <span className="flex items-center gap-1">
           <Clock size={11} />
-          {daysLeft} day{daysLeft !== 1 ? "s" : ""} left
+          {isJoined && progress !== null
+            ? `${Math.max(0, daysLeft - progress.checkedIn)} day${Math.max(0, daysLeft - progress.checkedIn) !== 1 ? "s" : ""} left`
+            : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
         </span>
       </div>
 
