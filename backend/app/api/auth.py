@@ -17,13 +17,13 @@ async def signup(data: UserSignupRequest, response: Response, db: AsyncSession =
     user, token = await service.signup(data)
 
     response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.is_production,
-        samesite="none",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    key="access_token",
+    value=token,
+    httponly=True,
+    secure=True,
+    samesite="none",
+    max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+)
 
     return TokenResponse(
         access_token=token,
@@ -37,13 +37,13 @@ async def login(data: UserLoginRequest, response: Response, db: AsyncSession = D
     user, token = await service.login(data)
 
     response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.is_production,
-        samesite="none",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    key="is_authenticated",
+    value="1",
+    httponly=False,
+    secure=True,
+    samesite="none",
+    max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+)
 
     return TokenResponse(
         access_token=token,

@@ -17,7 +17,7 @@ const PUBLIC_ROUTES = ["/", "/login", "/signup"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get("access_token");
+  const token = request.cookies.get("access_token") || request.cookies.get("is_authenticated");
 
   const isProtected = PROTECTED_ROUTES.some((route) =>
     pathname.startsWith(route)
