@@ -10,8 +10,13 @@ from app.api import auth, transactions, savings, reports, community, chat, ai, p
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_langsmith()
-    start_scheduler()
+    try:
+        configure_langsmith()
+        start_scheduler()
+        print("✅ Lumi started successfully", flush=True)
+    except Exception as e:
+        print(f"❌ Startup error: {e}", flush=True)
+        raise
     yield
     stop_scheduler()
 
