@@ -14,7 +14,7 @@ interface ShareWinModalProps {
 }
 
 export default function ShareWinModal({ isOpen, onClose, onPosted, currentTab }: ShareWinModalProps) {
-  const defaultType: PostType = currentTab === "Tips" ? "tip" : "win";
+  const defaultType: PostType = "win";
   const [postType, setPostType] = useState<PostType>(defaultType);
   const [content, setContent] = useState("");
   const [savingsPct, setSavingsPct] = useState("");
