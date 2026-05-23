@@ -21,7 +21,7 @@ async def signup(data: UserSignupRequest, response: Response, db: AsyncSession =
         value=token,
         httponly=True,
         secure=settings.is_production,
-        samesite="lax",
+        samesite="none",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -41,7 +41,7 @@ async def login(data: UserLoginRequest, response: Response, db: AsyncSession = D
         value=token,
         httponly=True,
         secure=settings.is_production,
-        samesite="lax",
+        samesite="none",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
