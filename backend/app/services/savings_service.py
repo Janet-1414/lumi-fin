@@ -50,18 +50,33 @@ class SavingsService:
 
     async def update_goal(self, user: User, goal_id: uuid.UUID, data: SavingsGoalUpdateRequest) -> SavingsGoal:
         goal = await self.get_goal_by_id(user, goal_id)
-        for field, value in data.model_dump(exclude_none=True).items():
-            setattr(goal, field, value)
 
-        # Check if goal is now completed
-        if goal.current_amount >= goal.target_amount and goal.status == GoalStatus.ACTIVE:
+    # Apply all fields except current_amount — handle that separately
+        for field, value in data.model_dump(exclude_none=True).items():
+            if field != "current_amount":
+                setattr(goal, field, value)
+
+    # Handle deposit — cap at target amount
+        if data.current_amount is not None:
+            new_amount = float(data.current_amount)
+            target = float(goal.target_amount)
+
+        # Cap at target — never allow going over
+            if new_amount >= target:
+                goal.current_amount = target
+            else:
+                goal.current_amount = new_amount
+
+    # Check if goal is now completed
+        if float(goal.current_amount) >= float(goal.target_amount) and goal.status == GoalStatus.ACTIVE:
             goal.status = GoalStatus.COMPLETED
             await self._award_badge(user, BadgeName.GOAL_CRUSHER, BadgeType.GOLD, "Completed a savings goal!")
 
         await self.db.commit()
         await self.db.refresh(goal)
         return goal
-
+    
+    
     async def delete_goal(self, user: User, goal_id: uuid.UUID) -> None:
         goal = await self.get_goal_by_id(user, goal_id)
         await self.db.delete(goal)
