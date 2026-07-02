@@ -1,3 +1,5 @@
+import { getToken } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface RequestOptions extends RequestInit {
@@ -27,11 +29,16 @@ class ApiClient {
     const { params, ...fetchOptions } = options;
     const url = this.buildUrl(path, params);
 
+    // Get token from localStorage for mobile where cookies don't work
+    const token = typeof window !== "undefined" ? getToken() : null;
+
     const response = await fetch(url, {
       ...fetchOptions,
-      credentials: "include", // Always send HTTP-only cookies
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        // Send as Bearer token — backend will accept either cookie or header
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...fetchOptions.headers,
       },
     });
@@ -61,10 +68,8 @@ class ApiClient {
     return this.request<T>(path, { method: "DELETE" });
   }
 
-  // Streaming SSE for AI chat
   stream(path: string, body: unknown): EventSource | null {
-    // We use fetch for SSE with POST body support
-    return null; // Handled separately via useChat hook
+    return null;
   }
 }
 

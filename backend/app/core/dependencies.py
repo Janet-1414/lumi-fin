@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, Cookie, status
+from fastapi import Depends, HTTPException, Cookie, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.database import get_db
@@ -8,6 +8,7 @@ from typing import Optional
 
 
 async def get_current_user(
+    request: Request,
     access_token: Optional[str] = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -15,10 +16,19 @@ async def get_current_user(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated. Please log in.",
     )
-    if not access_token:
+
+    token = access_token
+
+    # Fall back to Bearer token from Authorization header (for mobile)
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
         raise credentials_exception
 
-    user_id = decode_access_token(access_token)
+    user_id = decode_access_token(token)
     if not user_id:
         raise credentials_exception
 
