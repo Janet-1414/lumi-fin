@@ -194,10 +194,9 @@ export default function ChatPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="flex items-center gap-1.5 text-xs text-[var(--text-primary)] hover:text-mg-gold border border-mg-gold/40 px-2.5 py-1.5 rounded-card transition-all"
+              className="flex items-center gap-1.5 text-xs text-mg-gold border border-mg-gold/40 px-2.5 py-1.5 rounded-card hover:bg-mg-gold/10 transition-all"
             >
               <History size={12} />
-              
               History
             </button>
             <button
