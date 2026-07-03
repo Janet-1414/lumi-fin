@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ArrowLeftRight, Target, Users, MessageCircle } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Target, Users, BarChart2 } from "lucide-react";
 import { clsx } from "clsx";
 
 const BOTTOM_NAV = [
@@ -9,7 +9,7 @@ const BOTTOM_NAV = [
   { href: "/transactions", icon: ArrowLeftRight, label: "Txns" },
   { href: "/savings", icon: Target, label: "Savings" },
   { href: "/community", icon: Users, label: "Community" },
-  { href: "/chat", icon: MessageCircle, label: "AI Chat" },
+  { href: "/reports", icon: BarChart2, label: "Reports" },
 ];
 
 export default function BottomNav() {

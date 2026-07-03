@@ -1,5 +1,5 @@
 "use client";
-import { Bell, Zap } from "lucide-react";
+import { Bell, Zap, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/hooks/useUser";
 import { useNotificationStore } from "@/store/notificationStore";
@@ -24,6 +24,9 @@ export default function TopBar() {
         <span className="text-lg font-bold gradient-text">Lumi</span>
       </Link>
       <div className="flex items-center gap-3">
+        <Link href="/chat" className="text-[var(--text-muted)] hover:text-mg-gold transition-colors">
+          <MessageCircle size={20} />
+        </Link>
         <Link href="/notifications" className="relative text-[var(--text-muted)] hover:text-mg-gold transition-colors">
           <Bell size={20} />
           {unreadCount > 0 && (
