@@ -32,6 +32,16 @@ async def get_notifications(
     ]
 
 
+@router.patch("/read-all")
+async def mark_all_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = NotificationService(db)
+    await service.mark_all_read(current_user)
+    return {"message": "All notifications marked as read"}
+
+
 @router.patch("/{notification_id}/read")
 async def mark_read(
     notification_id: uuid.UUID,
@@ -43,14 +53,17 @@ async def mark_read(
     return {"message": "Marked as read"}
 
 
-@router.patch("/read-all")
-async def mark_all_read(
+@router.delete("/all")
+async def delete_all_notifications(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    service = NotificationService(db)
-    await service.mark_all_read(current_user)
-    return {"message": "All notifications marked as read"}
+    """Delete all notifications for the current user."""
+    await db.execute(
+        delete(Notification).where(Notification.user_id == current_user.id)
+    )
+    await db.commit()
+    return {"message": "All notifications deleted"}
 
 
 @router.delete("/{notification_id}")
@@ -68,16 +81,3 @@ async def delete_notification(
     )
     await db.commit()
     return {"message": "Notification deleted"}
-
-
-@router.delete("/all")
-async def delete_all_notifications(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Delete all notifications for the current user."""
-    await db.execute(
-        delete(Notification).where(Notification.user_id == current_user.id)
-    )
-    await db.commit()
-    return {"message": "All notifications deleted"}
