@@ -26,10 +26,7 @@ function renderInline(text: string): React.ReactNode {
   return parts.length === 0 ? text : <>{parts}</>;
 }
 
-// Split text that has inline numbered items like "1. Foo 2. Bar 3. Baz"
-// into an array of strings
 function splitInlineNumbered(text: string): string[] | null {
-  // Match patterns like "1. " or "1) " appearing mid-sentence
   const parts = text.split(/(?=\d+[.)]\s)/);
   const numbered = parts.filter((p) => /^\d+[.)]\s/.test(p.trim()));
   if (numbered.length >= 2) return parts.filter((p) => p.trim());
@@ -44,8 +41,14 @@ function splitInlineBullets(text: string): string[] | null {
 }
 
 function renderMarkdown(text: string): React.ReactNode {
-  // First try splitting the whole text by numbered items inline (e.g. "1. Foo 2. Bar")
-  const inlineNumbered = splitInlineNumbered(text);
+  // Fix streaming artifacts — collapse orphaned digits/commas back onto previous line
+  const cleaned = text
+    .replace(/(\d+,)\n(\d)/g, "$1$2")
+    .replace(/,\n(\d{3})/g, ",$1")
+    .replace(/(\d)\n(\d{3}[,\s])/g, "$1$2");
+
+  // Try splitting the whole text by numbered items inline
+  const inlineNumbered = splitInlineNumbered(cleaned);
   if (inlineNumbered) {
     const intro = inlineNumbered.filter((p) => !/^\d+[.)]\s/.test(p.trim()));
     const items = inlineNumbered.filter((p) => /^\d+[.)]\s/.test(p.trim()));
@@ -62,7 +65,7 @@ function renderMarkdown(text: string): React.ReactNode {
   }
 
   // Try splitting the whole text by inline bullets
-  const inlineBullets = splitInlineBullets(text);
+  const inlineBullets = splitInlineBullets(cleaned);
   if (inlineBullets) {
     const intro = inlineBullets.filter((p) => !/^[-•]\s/.test(p.trim()));
     const items = inlineBullets.filter((p) => /^[-•]\s/.test(p.trim()));
@@ -79,7 +82,7 @@ function renderMarkdown(text: string): React.ReactNode {
   }
 
   // Process line by line for multi-line responses
-  const lines = text.split("\n");
+  const lines = cleaned.split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
 
