@@ -26,8 +26,11 @@ export function useChat() {
   const [messages, setMessagesState] = useState<ChatMessage[]>(() => loadHistory());
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
 
+  // Keep ref in sync so sendMessage always has latest messages
   useEffect(() => {
+    messagesRef.current = messages;
     saveHistory(messages);
   }, [messages]);
 
@@ -37,14 +40,17 @@ export function useChat() {
 
   const sendMessage = useCallback(async (content: string) => {
     const userMsg: ChatMessage = { role: "user", content };
-    const assistantMsg: ChatMessage = { role: "assistant", content: "" };
+    // Show typing indicator immediately
+    const assistantMsg: ChatMessage = { role: "assistant", content: "..." };
+
+    // Capture history BEFORE adding new messages
+    const historySnapshot = messagesRef.current;
 
     setMessagesState((prev) => [...prev, userMsg, assistantMsg]);
     setIsStreaming(true);
 
     abortRef.current = new AbortController();
 
-    // Get Bearer token for mobile iOS where cookies don't work
     const token = getToken();
     const authHeaders: Record<string, string> = {
       "Content-Type": "application/json",
@@ -52,16 +58,13 @@ export function useChat() {
     };
 
     try {
-      const snapshot = messages;
-
-      // Try streaming first
       const response = await fetch(`${API_BASE}/api/v1/chat/stream`, {
         method: "POST",
         credentials: "include",
         headers: authHeaders,
         body: JSON.stringify({
           message: content,
-          conversation_history: snapshot,
+          conversation_history: historySnapshot,
         }),
         signal: abortRef.current.signal,
       });
@@ -74,15 +77,15 @@ export function useChat() {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
-      // If no reader (streaming not supported), fall back to non-streaming
       if (!reader) {
+        // Fallback to non-streaming
         const fallback = await fetch(`${API_BASE}/api/v1/chat`, {
           method: "POST",
           credentials: "include",
           headers: authHeaders,
           body: JSON.stringify({
             message: content,
-            conversation_history: snapshot,
+            conversation_history: historySnapshot,
           }),
         });
         const data = await fallback.json();
@@ -93,6 +96,9 @@ export function useChat() {
         });
         return;
       }
+
+      // Clear the "..." typing indicator when first token arrives
+      let firstToken = true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -108,7 +114,13 @@ export function useChat() {
               setMessagesState((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
-                updated[updated.length - 1] = { ...last, content: last.content + parsed.token };
+                // Replace "..." with first real token, then append subsequent tokens
+                const currentContent = firstToken ? "" : last.content;
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: currentContent + parsed.token,
+                };
+                firstToken = false;
                 return updated;
               });
             }
@@ -118,7 +130,7 @@ export function useChat() {
     } catch (error: any) {
       if (error.name === "AbortError") return;
 
-      // If streaming failed, try non-streaming fallback
+      // Try non-streaming fallback
       if (!error.message.includes("Pro") && !error.message.includes("401")) {
         try {
           const fallback = await fetch(`${API_BASE}/api/v1/chat`, {
@@ -127,14 +139,17 @@ export function useChat() {
             headers: authHeaders,
             body: JSON.stringify({
               message: content,
-              conversation_history: messages,
+              conversation_history: historySnapshot,
             }),
           });
           if (fallback.ok) {
             const data = await fallback.json();
             setMessagesState((prev) => {
               const updated = [...prev];
-              updated[updated.length - 1] = { role: "assistant", content: data.response || "Sorry, no response." };
+              updated[updated.length - 1] = {
+                role: "assistant",
+                content: data.response || "Sorry, no response.",
+              };
               return updated;
             });
             return;
@@ -155,7 +170,7 @@ export function useChat() {
     } finally {
       setIsStreaming(false);
     }
-  }, [messages]);
+  }, []);
 
   const stopStreaming = () => {
     abortRef.current?.abort();
