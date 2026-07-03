@@ -209,45 +209,54 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Mobile history panel — slides down from header */}
+        {/* Mobile history dropdown — shows list only, click a session to open it */}
         {showHistory && (
-          <div className="lg:hidden absolute top-[52px] left-0 right-0 z-20 bg-[var(--bg-secondary)] border-b border-[var(--border)] shadow-lg max-h-72 overflow-y-auto">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Chat History</p>
-              <button onClick={() => setShowHistory(false)} className="text-[var(--text-muted)] hover:text-mg-alert">
-                <X size={14} />
-              </button>
-            </div>
-            {sessions.length === 0 ? (
-              <div className="text-center py-8 px-4">
-                <MessageCircle size={24} className="text-[var(--text-muted)] mx-auto mb-2" />
-                <p className="text-xs text-[var(--text-muted)]">No history yet. Start chatting to see your conversations here.</p>
+          <>
+            {/* Backdrop to close on outside click */}
+            <div
+              className="lg:hidden fixed inset-0 z-10"
+              onClick={() => setShowHistory(false)}
+            />
+            <div className="lg:hidden absolute top-[52px] left-0 right-0 z-20 bg-[var(--bg-primary)] border-b border-[var(--border)] shadow-xl">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Chat History</p>
+                <button onClick={() => setShowHistory(false)} className="text-[var(--text-muted)] hover:text-mg-alert">
+                  <X size={14} />
+                </button>
               </div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => handleLoadSession(session)}
-                    className={`group flex items-center gap-2 px-3 py-2.5 rounded-card cursor-pointer transition-all ${
-                      activeSessionId === session.id
-                        ? "bg-mg-gold/10 border border-mg-gold/20 text-mg-gold"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-card)]"
-                    }`}
-                  >
-                    <MessageCircle size={13} className="flex-shrink-0" />
-                    <span className="text-xs flex-1 truncate">{session.title}</span>
-                    <button
-                      onClick={(e) => handleDeleteSession(session.id, e)}
-                      className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-mg-alert transition-all flex-shrink-0"
-                    >
-                      <Trash2 size={11} />
-                    </button>
+              <div className="max-h-64 overflow-y-auto">
+                {sessions.length === 0 ? (
+                  <div className="text-center py-8 px-4">
+                    <MessageCircle size={24} className="text-[var(--text-muted)] mx-auto mb-2" />
+                    <p className="text-xs text-[var(--text-muted)]">No history yet. Start chatting to see your conversations here.</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="p-2 space-y-1">
+                    {sessions.map((session) => (
+                      <div
+                        key={session.id}
+                        onClick={() => handleLoadSession(session)}
+                        className={`group flex items-center gap-2 px-3 py-2.5 rounded-card cursor-pointer transition-all ${
+                          activeSessionId === session.id
+                            ? "bg-mg-gold/10 border border-mg-gold/20 text-mg-gold"
+                            : "text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
+                        }`}
+                      >
+                        <MessageCircle size={13} className="flex-shrink-0 text-[var(--text-muted)]" />
+                        <span className="text-xs flex-1 truncate">{session.title}</span>
+                        <button
+                          onClick={(e) => handleDeleteSession(session.id, e)}
+                          className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-mg-alert transition-all flex-shrink-0"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          </>
         )}
 
         <ChatWindow messages={messages} isStreaming={isStreaming} userName={user.first_name} />
