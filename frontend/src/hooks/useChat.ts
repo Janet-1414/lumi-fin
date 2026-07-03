@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { API_BASE } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import type { ChatMessage } from "@/types/api";
 
 const STORAGE_KEY = "lumi_chat_current";
@@ -43,12 +44,21 @@ export function useChat() {
 
     abortRef.current = new AbortController();
 
+    // Get Bearer token for mobile iOS where cookies don't work
+    const token = getToken();
+    const authHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
     try {
       const snapshot = messages;
+
+      // Try streaming first
       const response = await fetch(`${API_BASE}/api/v1/chat/stream`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders,
         body: JSON.stringify({
           message: content,
           conversation_history: snapshot,
@@ -57,13 +67,32 @@ export function useChat() {
       });
 
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({ detail: "Chat failed" }));
         throw new Error(err.detail || "Chat failed");
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      if (!reader) return;
+
+      // If no reader (streaming not supported), fall back to non-streaming
+      if (!reader) {
+        const fallback = await fetch(`${API_BASE}/api/v1/chat`, {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders,
+          body: JSON.stringify({
+            message: content,
+            conversation_history: snapshot,
+          }),
+        });
+        const data = await fallback.json();
+        setMessagesState((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "assistant", content: data.response || "Sorry, no response." };
+          return updated;
+        });
+        return;
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -88,6 +117,31 @@ export function useChat() {
       }
     } catch (error: any) {
       if (error.name === "AbortError") return;
+
+      // If streaming failed, try non-streaming fallback
+      if (!error.message.includes("Pro") && !error.message.includes("401")) {
+        try {
+          const fallback = await fetch(`${API_BASE}/api/v1/chat`, {
+            method: "POST",
+            credentials: "include",
+            headers: authHeaders,
+            body: JSON.stringify({
+              message: content,
+              conversation_history: messages,
+            }),
+          });
+          if (fallback.ok) {
+            const data = await fallback.json();
+            setMessagesState((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: "assistant", content: data.response || "Sorry, no response." };
+              return updated;
+            });
+            return;
+          }
+        } catch {}
+      }
+
       setMessagesState((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {

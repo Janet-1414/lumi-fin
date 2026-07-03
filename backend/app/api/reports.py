@@ -12,7 +12,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 
 @router.get("", response_model=ReportResponse)
 async def get_report(
-    period: str = Query("month", enum=["month", "year"]),
+    period: str = Query("month"),  # No enum restriction — accepts month, last_month, year, all_time, 2026-05 etc
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -20,10 +20,9 @@ async def get_report(
     return await service.get_report(current_user, period)
 
 
-# AI Feature #8: Visual Reports with AI summary (Pro only)
 @router.get("/ai-summary", response_model=dict)
 async def get_ai_report_summary(
-    period: str = Query("month", enum=["month", "year"]),
+    period: str = Query("month"),
     current_user: User = Depends(get_current_pro_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -38,4 +37,4 @@ async def get_ai_report_summary(
         expenses=report.total_expenses,
         top_categories=top_cats,
     )
-    return {"ai_summary": summary, "period": period}
+    return {"summary": summary, "period": period}

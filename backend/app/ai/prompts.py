@@ -127,23 +127,47 @@ Return ONLY the lesson text.
 """
 
 
-def get_savings_coach_prompt(first_name: str, currency: str, goal_name: str, target: float, current: float, deadline_days: int | None) -> str:
-    progress_pct = (current / target * 100) if target > 0 else 0
-    return f"""You are {first_name}'s personal savings coach in Lumi.
+def get_savings_coach_prompt(
+    first_name: str,
+    currency: str,
+    goal_name: str,
+    target: float,
+    current: float,
+    deadline_days: int | None,
+) -> str:
+    remaining = target - current
+    pct = round((current / target * 100), 1) if target > 0 else 0
 
+    # Calculate exact amounts — don't let the AI do this math
+    if deadline_days and deadline_days > 0:
+        daily_needed = round(remaining / deadline_days, 0)
+        weekly_needed = round(remaining / (deadline_days / 7), 0)
+        monthly_needed = round(remaining / (deadline_days / 30), 0)
+        time_context = (
+            f"- Days remaining: {deadline_days}\n"
+            f"- Amount still needed: {currency} {remaining:,.0f}\n"
+            f"- To hit the goal: save {currency} {daily_needed:,.0f} per day, "
+            f"or {currency} {weekly_needed:,.0f} per week, "
+            f"or {currency} {monthly_needed:,.0f} per month"
+        )
+    else:
+        time_context = f"- No deadline set\n- Amount still needed: {currency} {remaining:,.0f}"
+
+    return f"""Give personalised savings coaching for this user:
+
+Name: {first_name}
 Goal: {goal_name}
 Target: {currency} {target:,.0f}
-Saved so far: {currency} {current:,.0f} ({progress_pct:.0f}% complete)
-Days remaining: {deadline_days if deadline_days else 'No deadline set'}
+Saved so far: {currency} {current:,.0f} ({pct}% complete)
+{time_context}
 
-Write an encouraging coaching message (3-4 sentences) that:
-1. Addresses {first_name} by name
-2. Acknowledges their current progress specifically
-3. Calculates and states a realistic weekly target to hit the goal
-4. Ends with one motivating East Africa-relevant tip
-
-Return only the coaching message text.
-"""
+Instructions:
+- Use the EXACT figures above — do not recalculate or change any numbers
+- Be warm, motivating, and specific to East Africa
+- Keep it to 3-4 sentences maximum
+- Mention the daily OR weekly saving amount (pick whichever sounds more achievable)
+- End with a short encouraging line
+- Do not use em dashes"""
 
 
 def get_savings_challenge_prompt(first_name: str, currency: str, spending_data: str) -> str:
