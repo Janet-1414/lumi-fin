@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete, func
 from app.models.notification import Notification, NotificationType
 from app.models.user import User
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from app.config import settings
 import uuid
+
+MAX_NOTIFICATIONS = 50
 
 
 def get_mail_config() -> ConnectionConfig:
@@ -44,12 +46,42 @@ class NotificationService:
         await self.db.commit()
         await self.db.refresh(notification)
 
+        # Auto-prune — keep only the 50 most recent notifications
+        await self._prune_old_notifications(user)
+
         if send_email and user.email_notifications:
             await self._send_email(user, title, message)
             notification.email_sent = True
             await self.db.commit()
 
         return notification
+
+    async def _prune_old_notifications(self, user: User) -> None:
+        """Delete oldest notifications beyond MAX_NOTIFICATIONS per user."""
+        # Get count
+        count_result = await self.db.execute(
+            select(func.count(Notification.id)).where(
+                Notification.user_id == user.id
+            )
+        )
+        count = count_result.scalar() or 0
+
+        if count > MAX_NOTIFICATIONS:
+            # Find the IDs of the oldest notifications to delete
+            oldest = await self.db.execute(
+                select(Notification.id)
+                .where(Notification.user_id == user.id)
+                .order_by(Notification.created_at.asc())
+                .limit(count - MAX_NOTIFICATIONS)
+            )
+            ids_to_delete = [row[0] for row in oldest.all()]
+            if ids_to_delete:
+                await self.db.execute(
+                    delete(Notification).where(
+                        Notification.id.in_(ids_to_delete)
+                    )
+                )
+                await self.db.commit()
 
     async def get_notifications(self, user: User, unread_only: bool = False) -> list[Notification]:
         conditions = [Notification.user_id == user.id]
@@ -61,7 +93,7 @@ class NotificationService:
             select(Notification)
             .where(and_(*conditions))
             .order_by(Notification.created_at.desc())
-            .limit(50)
+            .limit(MAX_NOTIFICATIONS)
         )
         return list(result.scalars().all())
 
@@ -101,5 +133,4 @@ class NotificationService:
             )
             await fm.send_message(message)
         except Exception:
-            # Email failure should not break the main flow
             pass
